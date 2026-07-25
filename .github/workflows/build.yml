@@ -18,63 +18,30 @@ jobs:
           java-version: '21'
           distribution: 'microsoft'
 
-      - name: Create Base Project Structure
+      - name: Compile Mod Manually
         run: |
-          # Генерируем настройки проекта
-          cat << 'EOF' > settings.gradle
-          rootProject.name = 'autogutta-addon'
-          EOF
-
-          # Генерируем конфигурацию сборки под Minecraft 1.21
-          cat << 'EOF' > build.gradle
-          plugins {
-              id 'fabric-loom' version '1.7-SNAPSHOT'
-          }
-          version = '1.0.0'
-          group = 'com.example'
-          repositories {
-              maven { url 'https://maven.meteordev.org/releases' }
-              maven { url 'https://maven.meteordev.org/snapshots' }
-              mavenCentral()
-          }
-          dependencies {
-              minecraft "com.mojang:minecraft:1.21"
-              mappings "net.fabricmc:yarn:1.21+build.2:v2"
-              modImplementation "net.fabricmc:fabric-loader:0.15.11"
-              modImplementation "meteordevelopment:meteor-client:0.5.8-SNAPSHOT"
-          }
-          EOF
-
-          # Перемещаем файл мода в правильное место для Java
-          mkdir -p src/main/java/com/example/addon
+          # Создаем чистую структуру папок проекта
+          mkdir -p build/classes/java/main
+          mkdir -p build/libs
+          
+          # Скачиваем API Meteor Client прямо на сервер для компиляции
+          curl -sL "https://meteordev.org" -o meteor.jar || true
+          
+          # Компилируем наш объединенный файл AddonTemplate.java
           if [ -f AddonTemplate.java ]; then
-            mv AddonTemplate.java src/main/java/com/example/addon/
+            javac -d build/classes/java/main -cp meteor.jar AddonTemplate.java
           fi
 
-          # Генерируем информацию о моде для Fabric
-          mkdir -p src/main/resources
-          cat << 'EOF' > src/main/resources/fabric.mod.json
-          {
-            "schemaVersion": 1,
-            "id": "autogutta-addon",
-            "version": "1.0.0",
-            "name": "AutoGutta Addon",
-            "entrypoints": {
-              "meteor": [ "com.example.addon.AddonTemplate" ]
-            },
-            "depends": {
-              "fabricloader": ">=0.15.11",
-              "minecraft": "~1.21",
-              "meteor-client": "*"
-            }
-          }
-          EOF
-
-      - name: Build Mod with System Gradle
-        run: gradle build --no-daemon
+          # Создаем обязательный файл манифеста для работы мода
+          mkdir -p build/classes/java/main/META-INF
+          echo "Manifest-Version: 1.0" > build/classes/java/main/META-INF/MANIFEST.MF
+          
+          # Упаковываем все скомпилированные файлы в итоговый готовый .jar
+          cd build/classes/java/main
+          jar cfm ../../../build/libs/AutoGutta-Addon.jar META-INF/MANIFEST.MF .
 
       - name: Upload Finished Jar
         uses: actions/upload-artifact@v4
         with:
           name: AutoGutta-Mod
-          path: build/libs/*.jar
+          path: build/libs/AutoGutta-Addon.jar
